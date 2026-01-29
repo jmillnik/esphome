@@ -192,6 +192,20 @@ def test_check_error_unexpected_response() -> None:
         espota2.check_error([0x7F], [espota2.RESPONSE_OK, espota2.RESPONSE_AUTH_OK])
 
 
+def test_check_error_empty_data() -> None:
+    """Test check_error raises error when device closes connection without responding."""
+    with pytest.raises(
+        espota2.OTAError, match="Device closed connection without responding"
+    ):
+        espota2.check_error([], [espota2.RESPONSE_OK])
+
+    # Also test with empty bytes
+    with pytest.raises(
+        espota2.OTAError, match="Device closed connection without responding"
+    ):
+        espota2.check_error(b"", [espota2.RESPONSE_OK])
+
+
 def test_send_check_with_various_data_types(mock_socket: Mock) -> None:
     """Test send_check handles different data types."""
 
@@ -287,7 +301,7 @@ def test_perform_ota_no_auth(mock_socket: Mock, mock_file: io.BytesIO) -> None:
 
     mock_socket.recv.side_effect = recv_responses
 
-    espota2.perform_ota(mock_socket, "", mock_file, "test.bin")
+    espota2.perform_ota(mock_socket, None, mock_file, "test.bin")
 
     # Should not send any auth-related data
     auth_calls = [
@@ -317,7 +331,7 @@ def test_perform_ota_with_compression(mock_socket: Mock) -> None:
 
     mock_socket.recv.side_effect = recv_responses
 
-    espota2.perform_ota(mock_socket, "", mock_file, "test.bin")
+    espota2.perform_ota(mock_socket, None, mock_file, "test.bin")
 
     # Verify compressed content was sent
     # Get the binary size that was sent (4 bytes after features)
@@ -347,7 +361,7 @@ def test_perform_ota_auth_without_password(mock_socket: Mock) -> None:
     with pytest.raises(
         espota2.OTAError, match="ESP requests password, but no password given"
     ):
-        espota2.perform_ota(mock_socket, "", mock_file, "test.bin")
+        espota2.perform_ota(mock_socket, None, mock_file, "test.bin")
 
 
 @pytest.mark.usefixtures("mock_time")
@@ -413,7 +427,7 @@ def test_perform_ota_sha256_auth_without_password(mock_socket: Mock) -> None:
     with pytest.raises(
         espota2.OTAError, match="ESP requests password, but no password given"
     ):
-        espota2.perform_ota(mock_socket, "", mock_file, "test.bin")
+        espota2.perform_ota(mock_socket, None, mock_file, "test.bin")
 
 
 def test_perform_ota_unexpected_auth_response(mock_socket: Mock) -> None:
@@ -450,7 +464,7 @@ def test_perform_ota_unsupported_version(mock_socket: Mock) -> None:
     mock_socket.recv.side_effect = responses
 
     with pytest.raises(espota2.OTAError, match="Device uses unsupported OTA version"):
-        espota2.perform_ota(mock_socket, "", mock_file, "test.bin")
+        espota2.perform_ota(mock_socket, None, mock_file, "test.bin")
 
 
 @pytest.mark.usefixtures("mock_time")
@@ -471,7 +485,7 @@ def test_perform_ota_upload_error(mock_socket: Mock, mock_file: io.BytesIO) -> N
     mock_socket.recv.side_effect = recv_responses
 
     with pytest.raises(espota2.OTAError, match="Error receiving acknowledge chunk OK"):
-        espota2.perform_ota(mock_socket, "", mock_file, "test.bin")
+        espota2.perform_ota(mock_socket, None, mock_file, "test.bin")
 
 
 @pytest.mark.usefixtures("mock_socket_constructor", "mock_resolve_ip")
@@ -493,7 +507,7 @@ def test_run_ota_impl_successful(
     assert result_host == "192.168.1.100"
 
     # Verify socket was configured correctly
-    mock_socket.settimeout.assert_called_with(10.0)
+    mock_socket.settimeout.assert_called_with(20.0)
     mock_socket.connect.assert_called_once_with(("192.168.1.100", 3232))
     mock_socket.close.assert_called_once()
 
@@ -706,7 +720,7 @@ def test_perform_ota_version_differences(
     ]
 
     mock_socket.recv.side_effect = recv_responses
-    espota2.perform_ota(mock_socket, "", mock_file, "test.bin")
+    espota2.perform_ota(mock_socket, None, mock_file, "test.bin")
 
     # For v1.0, verify that we only get the expected number of recv calls
     # v1.0 doesn't have chunk acknowledgments, so fewer recv calls
@@ -732,7 +746,7 @@ def test_perform_ota_version_differences(
     ]
 
     mock_socket.recv.side_effect = recv_responses_v2
-    espota2.perform_ota(mock_socket, "", mock_file, "test.bin")
+    espota2.perform_ota(mock_socket, None, mock_file, "test.bin")
 
     # For v2.0, verify more recv calls due to chunk acknowledgments
     assert mock_socket.recv.call_count == 9  # v2.0 has 9 recv calls (includes chunk OK)
